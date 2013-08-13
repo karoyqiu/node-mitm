@@ -1,0 +1,20 @@
+{
+    "folders":
+    [
+        {
+            "path": ".",
+            "file_include_patterns": ["*.js"]
+        }
+    ],
+
+    "build_systems":
+    [
+        {
+            "name": "node.js",
+            "cmd": ["node", "$file"],
+            "file_regex": "^[ ]*File \"(...*?)\", line ([0-9]*)",
+            "selector": "source.js",
+            "shell":true
+        }
+    ]
+}
