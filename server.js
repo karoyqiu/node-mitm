@@ -1,10 +1,11 @@
+var winston = require("winston");
 var http = require("http");
 var server = null;
 
 function start() {
     if (server === null) {
         function onRequest(request, response) {
-            console.log("Request received.");
+            winston.info("Request:", { url: request.url, headers: request.headers });
 
             var options = {
                 hostname: "sourceforge.net",
@@ -17,6 +18,7 @@ function start() {
             options.headers.host = options.hostname;
 
             var req = http.request(options, function(res) {
+                winston.info("Response:", { statusCode: res.statusCode, headers: res.headers });
                 response.writeHeader(res.statusCode, http.STATUS_CODES[res.statusCode], res.headers);
 
                 res.on("data", function(chunk) {
@@ -37,7 +39,7 @@ function start() {
             });
 
             req.on("error", function(e) {
-                console.error("Problem with request: " + e.message);
+                winston.error("Problem with request: " + e.message);
                 response.writeHeader(500);
                 response.end(e.message);
             });
@@ -45,9 +47,9 @@ function start() {
 
         server = http.createServer(onRequest);
         server.listen(8888);
-        console.log("The server started.");
+        winston.info("The server started.");
     } else {
-        console.warn("The server has already started.");
+        winston.warn("The server has already started.");
     }
 }
 
