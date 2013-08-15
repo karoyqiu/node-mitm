@@ -8,7 +8,7 @@ function start() {
         function onRequest(request, response) {
             winston.info("Request:", { url: request.url, headers: request.headers });
 
-            var startDateTime = Date.now();
+            var startTime = Date.now();
 
             var requestBodySize = 0;
             var requestBody = [];
@@ -16,7 +16,7 @@ function start() {
             var responseBody = [];
 
             var options = {
-                hostname: "sourceforge.net",
+                hostname: "www.baidu.com",
                 port: 80,
                 method: request.method,
                 path: request.url,
@@ -41,7 +41,7 @@ function start() {
 
                 res.on("end", function() {
                     if (Buffer.isBuffer(responseBody[0])) {
-                        responseBody = Buffer.concat(responseBody).encode("base64");
+                        responseBody = Buffer.concat(responseBody).toString("base64");
                     } else {
                         responseBody = responseBody.join("");
                     }
@@ -122,21 +122,23 @@ function start() {
                     // REQUEST DATA
                     // Fix up data-stucture with iterative data from request
                     // Headers
-                    Object.keys(req.headers).forEach(function (headerName) {
-                        data.log.entries[0].request.headersSize += headerName.length + 2 + req.headers[headerName].length;
+                    Object.keys(req._headers).forEach(function (headerName) {
+                        data.log.entries[0].request.headersSize += headerName.length + 2 + req._headers[headerName].length;
                         data.log.entries[0].request.headers.push({
                             name: headerName,
-                            value: req.headers[headerName]
+                            value: req._headers[headerName]
                         });
                     });
 
                     // Query strings
+/*
                     Object.keys(req.query).forEach(function (queryName) {
                         data.log.entries[0].request.queryString.push({
                             name: queryName,
                             value: req.query[queryName]
                         });
                     });
+*/
 
                     Object.keys(res.headers).forEach(function (headerName) {
                         data.log.entries[0].response.headersSize += headerName.length + 2 + res.headers[headerName].length;
@@ -148,7 +150,7 @@ function start() {
 
                     // Write the data out
                     fs.writeFile(
-                        path.join("./", Date.now().toString() + '-' + outputName + '.har'),
+                        Date.now().toString() + "-host.har",
                         JSON.stringify(data, undefined, 2)
                     );
                 });

@@ -2,8 +2,7 @@
     "folders":
     [
         {
-            "path": ".",
-            "file_include_patterns": ["*.js"]
+            "path": "."
         }
     ],
 
