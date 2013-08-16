@@ -2,11 +2,25 @@ var winston = require("winston");
 var http = require("http");
 var fs = require('fs');
 var server = null;
+var targetHost = "www.baidu.com";
+
+var data = {
+    log: {
+        version: '1.2', // Version of HAR file-format
+        creator: {
+            name: 'node-mitm-har-capture',
+            version: '0.0.1' // TODO: Get from package.json
+            // comment: ""
+        },
+        pages: [],
+        entries: []
+    }
+};
 
 function start() {
     if (server === null) {
         function onRequest(request, response) {
-            winston.info("Request:", { url: request.url, headers: request.headers });
+            winston.info("Request:", { url: request.url });
 
             var startTime = Date.now();
 
@@ -16,7 +30,7 @@ function start() {
             var responseBody = [];
 
             var options = {
-                hostname: "www.baidu.com",
+                hostname: targetHost,
                 port: 80,
                 method: request.method,
                 path: request.url,
@@ -26,7 +40,7 @@ function start() {
             options.headers.host = options.hostname;
 
             var req = http.request(options, function(res) {
-                winston.info("Response:", { statusCode: res.statusCode, headers: res.headers });
+                winston.info("Response:", { statusCode: res.statusCode });
                 response.writeHeader(res.statusCode, http.STATUS_CODES[res.statusCode], res.headers);
 
                 responseBodySize = 0;
@@ -52,79 +66,70 @@ function start() {
                     var deltaTime = endTime - startTime;
 
                     // Store har-stuff...
-                    var data = {
-                        log: {
-                            version: '1.1', // Version of HAR file-format
-                            creator: {
-                                name: 'node-mitm-har-capture',
-                                version: '0.0.1' // TODO: Get from package.json
-                                // comment: ""
+                    var pageId = "page" + startTime;
+                    var page = {
+                        startedDateTime: new Date(startTime).toISOString(),
+                        id: pageId,
+                        title: req.path,
+                        pageTimings: { onLoad: deltaTime }
+                    };
+                    var entry = {
+                        timings: {
+                            send: -1,
+                            receive: -1,
+                            wait: deltaTime,
+                            onLoad: -1,
+                        },
+                        startedDateTime: new Date(startTime).toISOString(),
+                        time: deltaTime,
+                        request: {
+                            method: req.method,
+                            url: req.path,
+                            httpVersion: 'HTTP/' + req.res.httpVersion,
+                            headersSize: 0, // Filled out later
+                            headers: [], // Filled out later
+                            queryString: [], // TODO
+                            cookies: [], // TODO
+                            bodySize: requestBodySize,
+                            content: {
+                                size: requestBodySize,
+                                text: requestBody,
+                                comment: "Captured input stream"
+                            }
+                        },
+                        response: {
+                            status: res.statusCode,
+                            redirectURL: req.originalUrl,
+                            httpVersion: 'HTTP/' + req.httpVersion, // TODO
+                            headersSize: -1,
+                            statusText: http.STATUS_CODES[res.statusCode], // TODO
+                            headers: [],
+                            cookies: [], // TODO
+                            bodySize: -1, // TODO
+                            redirectURL: "",
+                            content: { // TODO
+                                size: responseBodySize,
+                                mimeType: '',
+                                text: responseBody,
+                                compression: -1
                             },
-                            pages: [{
-                                startedDateTime: new Date(startTime).toISOString(),
-                                id: 'page' + startTime,
-                                title: req.url,
-                                pageTimings: { onLoad: deltaTime }
-                            }],
-                            entries: [{
-                                timings: {
-                                    send: -1,
-                                    receive: -1,
-                                    wait: deltaTime,
-                                    comment: "Server-side processing only",
-                                    onLoad: -1,
-                                },
-                                startedDateTime: new Date(startTime).toISOString(),
-                                time: deltaTime,
-                                request: {
-                                    method: req.method,
-                                    url: req.originalUrl,
-                                    httpVersion: 'HTTP/' + req.httpVersion,
-                                    headersSize: 0, // Filled out later
-                                    headers: [], // Filled out later
-                                    queryString: [], // TODO
-                                    cookies: [], // TODO
-                                    bodySize: requestBodySize,
-                                    content: {
-                                        size: requestBodySize,
-                                        text: requestBody,
-                                        comment: "Captured input stream"
-                                    }
-                                },
-                                response: {
-                                    status: res.statusCode,
-                                    redirectURL: req.originalUrl,
-                                    httpVersion: 'HTTP/' + req.httpVersion, // TODO
-                                    headersSize: -1,
-                                    statusText: http.STATUS_CODES[res.statusCode], // TODO
-                                    headers: [],
-                                    cookies: [], // TODO
-                                    bodySize: -1, // TODO
-                                    content: { // TODO
-                                        size: responseBodySize,
-                                        mimeType: '',
-                                        text: responseBody,
-                                        compression: -1
-                                    },
-                                    timings: {
-                                        send: 0,
-                                        receive: 0,
-                                        wait: deltaTime,
-                                        comment: "Server-side processing only"
-                                    }
-                                },
-                                cache: {}, // TODO / is it optional
-                                pageref: 'page' + startTime
-                            }]
-                        }
+                            timings: {
+                                send: 0,
+                                receive: 0,
+                                wait: deltaTime,
+                                comment: "Server-side processing only"
+                            }
+                        },
+                        cache: {}, // TODO / is it optional
+                        pageref: pageId
                     };
 
                     // REQUEST DATA
                     // Fix up data-stucture with iterative data from request
                     // Headers
                     Object.keys(req._headers).forEach(function (headerName) {
-                        data.log.entries[0].request.headersSize += headerName.length + 2 + req._headers[headerName].length;
-                        data.log.entries[0].request.headers.push({
+                        entry.request.headersSize += headerName.length + 2 + req._headers[headerName].length;
+                        entry.request.headers.push({
                             name: headerName,
                             value: req._headers[headerName]
                         });
@@ -133,7 +138,7 @@ function start() {
                     // Query strings
 /*
                     Object.keys(req.query).forEach(function (queryName) {
-                        data.log.entries[0].request.queryString.push({
+                        entry.request.queryString.push({
                             name: queryName,
                             value: req.query[queryName]
                         });
@@ -141,16 +146,26 @@ function start() {
 */
 
                     Object.keys(res.headers).forEach(function (headerName) {
-                        data.log.entries[0].response.headersSize += headerName.length + 2 + res.headers[headerName].length;
-                        data.log.entries[0].response.headers.push({
+                        entry.response.headersSize += headerName.length + 2 + res.headers[headerName].length;
+
+                        var v = res.headers[headerName];
+
+                        if (v instanceof Array) {
+                            v = v.join();
+                        }
+
+                        entry.response.headers.push({
                             name: headerName,
-                            value: res.headers[headerName]
+                            value: v
                         });
                     });
 
+                    data.log.pages.push(page);
+                    data.log.entries.push(entry);
+
                     // Write the data out
                     fs.writeFile(
-                        Date.now().toString() + "-host.har",
+                        targetHost + "-host.har",
                         JSON.stringify(data, undefined, 2)
                     );
                 });
@@ -190,11 +205,15 @@ function start() {
 }
 
 function stop() {
-    if (server !== null) {
+    winston.info("What?");
+
+    //if (server != null) {
+        winston.info("Closing up.");
         server.close();
+        winston.info("Closing up 2.");
         server = null;
-        console.log("The server stopped.");
-    }
+        winston.info("The server stopped.");
+    //}
 }
 
 exports.start = start;
