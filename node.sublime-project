@@ -3,7 +3,7 @@
     [
         {
             "path": ".",
-            "file_include_patterns": ["*.js"]
+            "file_exclude_patterns":["*.log", "*.har"]
         }
     ],
 
